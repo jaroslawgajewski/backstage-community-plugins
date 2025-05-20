@@ -53,11 +53,17 @@ export const PermissionsCard = ({
     usePermissionPolicies(entityReference);
   const [searchText, setSearchText] = useState<string>();
 
+  // Add logging immediately after this line to inspect defaultPolicies:
+  console.log('[PermissionsCard] defaultPolicies received from hook:', defaultPolicies);
+
   const combinedData = useMemo(() => {
     const roles = Array.isArray(rolePolicies) ? rolePolicies : [];
     const defaults = Array.isArray(defaultPolicies) ? defaultPolicies : [];
     return [...roles, ...defaults];
   }, [rolePolicies, defaultPolicies]);
+
+  // Add logging immediately after this useMemo block to inspect combinedData:
+  console.log('[PermissionsCard] combinedData after merging:', combinedData);
 
   const numberOfPolicies = useMemo(() => {
     // Ensure 'columns' is imported or defined in this file.

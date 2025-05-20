@@ -101,19 +101,46 @@ export const usePermissionPolicies = (
   });
 
   const {
-    value: defaultPermissions,
+    value: defaultPermissionsData, // Renamed to defaultPermissionsData for clarity
     retry: defaultPermissionsRetry,
     error: defaultPermissionsError,
   } = useAsyncRetry(async () => {
-    return await rbacApi.getDefaultPermissions();
-  });
+    console.log('[usePermissionPolicies] Attempting to fetch default permissions...');
+    try {
+      const result = await rbacApi.getDefaultPermissions();
+      // Check if result is a Response object (error case from client)
+      if (result instanceof Response) {
+        if (!result.ok) {
+          console.error('[usePermissionPolicies] Error fetching default permissions, status:', result.status, 'Response:', result);
+          // This will likely be caught by defaultPermissionsError via useAsyncRetry's mechanics
+          // but logging it here can be useful.
+          // To ensure it's treated as an error by useAsyncRetry, we might need to throw.
+          throw new Error(`Failed to fetch default permissions: ${result.status}`);
+        }
+        // If it's a Response but somehow OK (shouldn't happen based on client logic)
+        const data = await result.json();
+        console.log('[usePermissionPolicies] Received default permissions (from Response object):', data);
+        return data;
+      }
+      console.log('[usePermissionPolicies] Successfully fetched default permissions:', result);
+      return result;
+    } catch (e) {
+      console.error('[usePermissionPolicies] Exception during getDefaultPermissions call:', e);
+      throw e; // Re-throw to be caught by useAsyncRetry
+    }
+  }, [rbacApi]); // Added rbacApi to dependency array
+
+  // After the useAsyncRetry block for defaultPermissions:
+  if (defaultPermissionsError) {
+    console.error('[usePermissionPolicies] defaultPermissionsError:', defaultPermissionsError);
+  }
 
   const loading =
     !permissionPoliciesError &&
     !policiesError &&
     !conditionalPoliciesError &&
     !defaultPermissionsError && // Add this
-    (!permissionPolicies || !policies || !conditionalPolicies || !defaultPermissions); // Add !defaultPermissions
+    (!permissionPolicies || !policies || !conditionalPolicies || !defaultPermissionsData); // Add !defaultPermissionsData
 
   const allPermissionPolicies = useMemo(
     () => (Array.isArray(permissionPolicies) ? permissionPolicies : []),
@@ -152,8 +179,8 @@ export const usePermissionPolicies = (
   );
 
   const processedDefaultPermissions = useMemo(() => {
-    if (Array.isArray(defaultPermissions)) {
-      return defaultPermissions.map(dp => ({
+    if (Array.isArray(defaultPermissionsData)) {
+      return defaultPermissionsData.map(dp => ({
         entityReference: '<default>', // Special marker for default policies
         permission: dp.permission,
         policy: dp.policy, // 'policy' from default is 'action' in RoleBasedPolicy
@@ -162,7 +189,10 @@ export const usePermissionPolicies = (
       } as RoleBasedPolicy)); // Cast to RoleBasedPolicy or a compatible type
     }
     return [];
-  }, [defaultPermissions]);
+  }, [defaultPermissionsData]);
+
+  // After the useMemo block for processedDefaultPermissions:
+  console.log('[usePermissionPolicies] processedDefaultPermissions:', processedDefaultPermissions);
 
   return {
     loading,
@@ -174,6 +204,6 @@ export const usePermissionPolicies = (
       permissionPoliciesError ||
       conditionalPoliciesError ||
       defaultPermissionsError || // Add this
-      getErrorText(policies, permissionPolicies, conditionalPolicies, defaultPermissions), // Pass defaultPermissions
+      getErrorText(policies, permissionPolicies, conditionalPolicies, defaultPermissionsData), // Pass defaultPermissionsData
   };
 };

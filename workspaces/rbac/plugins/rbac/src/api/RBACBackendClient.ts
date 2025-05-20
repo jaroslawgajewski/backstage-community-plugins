@@ -473,16 +473,22 @@ export class RBACBackendClient implements RBACAPI {
   async getDefaultPermissions(): Promise<DefaultPermissionPolicy[] | Response> {
     const { token: idToken } = await this.identityApi.getCredentials();
     const backendUrl = this.configApi.getString('backend.baseUrl');
-    const jsonResponse = await fetch(`${backendUrl}/api/permission/default-permissions`, {
+    const fetchResponse = await fetch(`${backendUrl}/api/permission/default-permissions`, { // Renamed to fetchResponse for clarity
       headers: {
         ...(idToken && { Authorization: `Bearer ${idToken}` }),
         'Content-Type': 'application/json',
       },
     });
-    if (jsonResponse.status !== 200) {
-      // Return the raw response if not OK, similar to other methods
-      return jsonResponse;
+
+    console.log('[RBACBackendClient] getDefaultPermissions raw response status:', fetchResponse.status);
+
+    if (fetchResponse.status !== 200) {
+      console.log('[RBACBackendClient] getDefaultPermissions raw response text (if any):', await fetchResponse.text());
+      return fetchResponse; // Return the raw response if not OK
     }
-    return jsonResponse.json() as Promise<DefaultPermissionPolicy[]>;
+
+    const jsonData = await fetchResponse.json();
+    console.log('[RBACBackendClient] getDefaultPermissions jsonData:', jsonData);
+    return jsonData as DefaultPermissionPolicy[]; // Assuming jsonData is already the correct type
   }
 }

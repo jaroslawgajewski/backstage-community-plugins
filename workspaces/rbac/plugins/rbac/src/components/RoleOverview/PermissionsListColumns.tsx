@@ -31,6 +31,9 @@ export const columns: TableColumn<PermissionsData>[] = [
     field: 'permission',
     type: 'string',
     render: (rowData: PermissionsData) => {
+      console.log('[PermissionsListColumns] "Permission" column render, rowData:', rowData); // Log the entire rowData
+      console.log('[PermissionsListColumns] "Permission" column, rowData.metadata?.source:', rowData.metadata?.source); // Log the source specifically
+
       if (rowData.metadata?.source === 'default') {
         return (
           <Box style={{ display: 'flex', alignItems: 'center' }}>
@@ -47,6 +50,10 @@ export const columns: TableColumn<PermissionsData>[] = [
     field: 'policyString', // This field might not be directly used by the new render for defaults
     type: 'string',
     render: (rowData: PermissionsData) => {
+      console.log('[PermissionsListColumns] "Policies" column render, rowData:', rowData); // Log the entire rowData
+      console.log('[PermissionsListColumns] "Policies" column, rowData.metadata?.source:', rowData.metadata?.source); // Log the source
+      console.log('[PermissionsListColumns] "Policies" column, rowData.effect:', rowData.effect); // Log the effect
+
       if (rowData.metadata?.source === 'default') {
         if (rowData.effect === 'allow') {
           return <Chip label="Allow (Default)" size="small" style={{ backgroundColor: 'green', color: 'white', margin: '2px' }} />;
