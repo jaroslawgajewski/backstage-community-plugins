@@ -18,9 +18,10 @@ import { useAsyncRetry, useInterval } from 'react-use';
 
 import { useApi } from '@backstage/core-plugin-api';
 
-import { rbacApiRef } from '../api/RBACBackendClient';
+import { rbacApiRef, DefaultPermissionPolicy } from '../api/RBACBackendClient';
 import { getPluginsPermissionPoliciesData } from '../utils/create-role-utils';
 import {
+  RoleBasedPolicy, // Ensure RoleBasedPolicy is imported if not already
   getConditionalPermissionsData,
   getPermissionsData,
 } from '../utils/rbac-utils';
@@ -29,6 +30,7 @@ const getErrorText = (
   policies: any,
   permissionPolicies: any,
   conditionalPolicies: any,
+  defaultPermissionsVal: any, // Add defaultPermissionsVal
 ): { name: number; message: string } | undefined => {
   if (!Array.isArray(policies) && (policies as Response)?.statusText) {
     return {
@@ -53,6 +55,16 @@ const getErrorText = (
       name: (conditionalPolicies as Response).status,
       message: `Error fetching the conditional permission policies. ${
         (conditionalPolicies as Response).statusText
+      }`,
+    };
+  } else if (
+    !Array.isArray(defaultPermissionsVal) && // Check for defaultPermissionsVal
+    (defaultPermissionsVal as Response)?.statusText
+  ) {
+    return {
+      name: (defaultPermissionsVal as Response).status,
+      message: `Error fetching default permissions. ${
+        (defaultPermissionsVal as Response).statusText
       }`,
     };
   }
@@ -88,11 +100,20 @@ export const usePermissionPolicies = (
     return await rbacApi.listPermissions();
   });
 
+  const {
+    value: defaultPermissions,
+    retry: defaultPermissionsRetry,
+    error: defaultPermissionsError,
+  } = useAsyncRetry(async () => {
+    return await rbacApi.getDefaultPermissions();
+  });
+
   const loading =
     !permissionPoliciesError &&
     !policiesError &&
     !conditionalPoliciesError &&
-    (!permissionPolicies || !policies || !conditionalPolicies);
+    !defaultPermissionsError && // Add this
+    (!permissionPolicies || !policies || !conditionalPolicies || !defaultPermissions); // Add !defaultPermissions
 
   const allPermissionPolicies = useMemo(
     () => (Array.isArray(permissionPolicies) ? permissionPolicies : []),
@@ -125,17 +146,34 @@ export const usePermissionPolicies = (
       policiesRetry();
       permissionPoliciesRetry();
       conditionalPoliciesRetry();
+      defaultPermissionsRetry(); // Add this
     },
     loading ? null : pollInterval || null,
   );
+
+  const processedDefaultPermissions = useMemo(() => {
+    if (Array.isArray(defaultPermissions)) {
+      return defaultPermissions.map(dp => ({
+        entityReference: '<default>', // Special marker for default policies
+        permission: dp.permission,
+        policy: dp.policy, // 'policy' from default is 'action' in RoleBasedPolicy
+        effect: dp.effect,
+        metadata: { source: 'default' }, // Indicate source
+      } as RoleBasedPolicy)); // Cast to RoleBasedPolicy or a compatible type
+    }
+    return [];
+  }, [defaultPermissions]);
+
   return {
     loading,
-    data: [...conditionsData, ...data],
-    retry: { policiesRetry, permissionPoliciesRetry, conditionalPoliciesRetry },
+    rolePolicies: [...conditionsData, ...data], // Existing combined data
+    defaultPolicies: processedDefaultPermissions, // New field for defaults
+    retry: { policiesRetry, permissionPoliciesRetry, conditionalPoliciesRetry, defaultPermissionsRetry },
     error:
       policiesError ||
       permissionPoliciesError ||
       conditionalPoliciesError ||
-      getErrorText(policies, permissionPolicies, conditionalPolicies),
+      defaultPermissionsError || // Add this
+      getErrorText(policies, permissionPolicies, conditionalPolicies, defaultPermissions), // Pass defaultPermissions
   };
 };

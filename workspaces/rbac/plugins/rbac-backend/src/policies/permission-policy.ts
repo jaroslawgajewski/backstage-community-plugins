@@ -224,6 +224,10 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     this.defaultPermissions = defaultPermissions;
   }
 
+  public getDefaultPermissions(): Array<{ permission: string; policy: string; effect: string }> {
+    return this.defaultPermissions;
+  }
+
   async handle(
     request: PolicyQuery,
     user?: PolicyQueryUser,

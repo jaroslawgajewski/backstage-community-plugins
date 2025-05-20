@@ -28,6 +28,13 @@ import {
   RoleConditionalPolicyDecision,
 } from '@backstage-community/plugin-rbac-common';
 
+// Add this type definition near other similar types
+export interface DefaultPermissionPolicy {
+  permission: string;
+  policy: string; // This is the action (e.g., 'read', 'use', 'create')
+  effect: string; // 'allow' or 'deny'
+}
+
 import {
   MemberEntity,
   PluginConditionRules,
@@ -75,6 +82,7 @@ export type RBACAPI = {
   deleteConditionalPolicies: (
     conditionId: number,
   ) => Promise<RoleError | Response>;
+  getDefaultPermissions: () => Promise<DefaultPermissionPolicy[] | Response>;
 };
 
 export type Options = {
@@ -460,5 +468,21 @@ export class RBACBackendClient implements RBACAPI {
       return jsonResponse.json();
     }
     return jsonResponse;
+  }
+
+  async getDefaultPermissions(): Promise<DefaultPermissionPolicy[] | Response> {
+    const { token: idToken } = await this.identityApi.getCredentials();
+    const backendUrl = this.configApi.getString('backend.baseUrl');
+    const jsonResponse = await fetch(`${backendUrl}/api/permission/default-permissions`, {
+      headers: {
+        ...(idToken && { Authorization: `Bearer ${idToken}` }),
+        'Content-Type': 'application/json',
+      },
+    });
+    if (jsonResponse.status !== 200) {
+      // Return the raw response if not OK, similar to other methods
+      return jsonResponse;
+    }
+    return jsonResponse.json() as Promise<DefaultPermissionPolicy[]>;
   }
 }
