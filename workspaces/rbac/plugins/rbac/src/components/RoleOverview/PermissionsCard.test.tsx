@@ -15,10 +15,10 @@
  */
 import { usePermission } from '@backstage/plugin-permission-react';
 import { renderInTestApp } from '@backstage/test-utils';
+import { waitFor } from '@testing-library/react';
 
-import { mockFormInitialValues } from '../../__fixtures__/mockFormValues';
 import { usePermissionPolicies } from '../../hooks/usePermissionPolicies';
-import { PermissionsData } from '../../types';
+import { PermissionsData, ConditionsData } from '../../types';
 import { PermissionsCard } from './PermissionsCard';
 
 jest.mock('../../hooks/usePermissionPolicies', () => ({
@@ -33,7 +33,7 @@ const usePermissionPoliciesMockData: PermissionsData[] = [
   {
     permission: 'policy-entity',
     plugin: 'permission',
-    policyString: ['Read', ', Create', ', Delete'],
+    policyString: ['Read', ', Create', ', Delete'], // This will be joined to "Read, Create, Delete"
     policies: [
       {
         policy: 'read',
@@ -51,6 +51,23 @@ const usePermissionPoliciesMockData: PermissionsData[] = [
   },
 ];
 
+// Mock for mockFormInitialValues.permissionPoliciesRows
+const mockPermissionPoliciesRowsConditional: PermissionsData[] = [
+  {
+    permission: 'conditional-policy',
+    plugin: 'catalog',
+    policyString: ['Use'],
+    policies: [{ policy: 'use', effect: 'allow' }],
+    conditions: {
+      condition: {
+        rule: 'IS_ENTITY_OWNER',
+        resourceType: 'catalog-entity',
+        params: {},
+      },
+    } as ConditionsData,
+  },
+];
+
 const mockPermissionPolicies = usePermissionPolicies as jest.MockedFunction<
   typeof usePermissionPolicies
 >;
@@ -63,33 +80,46 @@ describe('PermissionsCard', () => {
     mockUsePermission.mockReturnValue({ loading: false, allowed: true });
     mockPermissionPolicies.mockReturnValue({
       loading: false,
-      data: usePermissionPoliciesMockData,
+      rolePolicies: usePermissionPoliciesMockData,
+      defaultPolicies: [],
       retry: {
         policiesRetry: jest.fn(),
         permissionPoliciesRetry: jest.fn(),
         conditionalPoliciesRetry: jest.fn(),
+        defaultPermissionsRetry: jest.fn(),
       },
       error: new Error(''),
     });
-    const { queryByText } = await renderInTestApp(
+    const { queryByText, findAllByText } = await renderInTestApp(
       <PermissionsCard
         entityReference="user:default/debsmita1"
         canReadUsersAndGroups
       />,
     );
-    expect(queryByText('3 permissions')).not.toBeNull();
-    expect(queryByText('Read, Create, Delete')).not.toBeNull();
+    // Check for plugin and permission name
+    expect(queryByText('permission')).toBeInTheDocument(); // For plugin
+    expect(queryByText('policy-entity')).toBeInTheDocument(); // For permission name
+
+    // Check for "Allow" chips (there should be 3)
+    const allowChips = await findAllByText('Allow');
+    expect(allowChips).toHaveLength(3);
+
+    await waitFor(() => {
+      expect(queryByText('Permission Policies (3)')).toBeInTheDocument();
+    });
   });
 
   it('should show empty table when there are no permission policies', async () => {
     mockUsePermission.mockReturnValue({ loading: false, allowed: true });
     mockPermissionPolicies.mockReturnValue({
       loading: false,
-      data: [],
+      rolePolicies: [],
+      defaultPolicies: [],
       retry: {
         policiesRetry: jest.fn(),
         permissionPoliciesRetry: jest.fn(),
         conditionalPoliciesRetry: jest.fn(),
+        defaultPermissionsRetry: jest.fn(),
       },
       error: new Error(''),
     });
@@ -102,15 +132,18 @@ describe('PermissionsCard', () => {
     expect(queryByText('Permission Policies')).not.toBeNull();
     expect(queryByText('No records found')).not.toBeNull();
   });
+
   it('should show an error if api call fails', async () => {
     mockUsePermission.mockReturnValue({ loading: false, allowed: true });
     mockPermissionPolicies.mockReturnValue({
       loading: false,
-      data: [],
+      rolePolicies: [],
+      defaultPolicies: [],
       retry: {
         policiesRetry: jest.fn(),
         permissionPoliciesRetry: jest.fn(),
         conditionalPoliciesRetry: jest.fn(),
+        defaultPermissionsRetry: jest.fn(),
       },
       error: { message: '404', name: 'Not Found' },
     });
@@ -128,16 +161,19 @@ describe('PermissionsCard', () => {
 
     expect(queryByText('No records found')).not.toBeNull();
   });
+
   it('should show edit icon when the user is authorized to update roles', async () => {
     mockUsePermission.mockReturnValue({ loading: false, allowed: true });
     mockPermissionPolicies.mockReturnValue({
       loading: false,
-      data: [],
+      rolePolicies: [],
+      defaultPolicies: [],
       error: new Error(''),
       retry: {
         policiesRetry: jest.fn(),
         permissionPoliciesRetry: jest.fn(),
         conditionalPoliciesRetry: jest.fn(),
+        defaultPermissionsRetry: jest.fn(),
       },
     });
     const { getByTestId } = await renderInTestApp(
@@ -153,12 +189,14 @@ describe('PermissionsCard', () => {
     mockUsePermission.mockReturnValue({ loading: false, allowed: false });
     mockPermissionPolicies.mockReturnValue({
       loading: false,
-      data: [],
+      rolePolicies: [],
+      defaultPolicies: [],
       error: new Error(''),
       retry: {
         policiesRetry: jest.fn(),
         permissionPoliciesRetry: jest.fn(),
         conditionalPoliciesRetry: jest.fn(),
+        defaultPermissionsRetry: jest.fn(),
       },
     });
     const { queryByTestId } = await renderInTestApp(
@@ -174,26 +212,37 @@ describe('PermissionsCard', () => {
     mockUsePermission.mockReturnValue({ loading: false, allowed: true });
     mockPermissionPolicies.mockReturnValue({
       loading: false,
-      data: [
-        ...usePermissionPoliciesMockData,
-        ...mockFormInitialValues.permissionPoliciesRows,
-      ],
+      rolePolicies: mockPermissionPoliciesRowsConditional, // Use conditional mock
+      defaultPolicies: [],
       retry: {
         policiesRetry: jest.fn(),
         permissionPoliciesRetry: jest.fn(),
         conditionalPoliciesRetry: jest.fn(),
+        defaultPermissionsRetry: jest.fn(),
       },
       error: new Error(''),
     });
-    const { queryByText } = await renderInTestApp(
+    const { queryByText, findAllByText } = await renderInTestApp(
       <PermissionsCard
         entityReference="user:default/debsmita1"
         canReadUsersAndGroups
       />,
     );
-    expect(queryByText('4 permissions')).not.toBeNull();
-    expect(queryByText('Read, Create, Delete', { exact: true })).not.toBeNull();
-    expect(queryByText('Read', { exact: true })).not.toBeNull();
-    expect(queryByText('1 rule')).not.toBeNull();
+
+    // Check for plugin and permission name
+    expect(queryByText('catalog')).toBeInTheDocument(); // For plugin
+    expect(queryByText('conditional-policy')).toBeInTheDocument(); // For permission name
+
+    // Check for "Allow" chip (there should be 1)
+    const allowChips = await findAllByText('Allow');
+    expect(allowChips).toHaveLength(1);
+
+    // Check for conditional rule text
+    expect(queryByText('1 rule')).toBeInTheDocument();
+
+    await waitFor(() => {
+      // Title count should be 1 for this mock data
+      expect(queryByText('Permission Policies (1)')).toBeInTheDocument();
+    });
   });
 });

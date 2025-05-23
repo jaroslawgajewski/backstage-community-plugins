@@ -23,6 +23,9 @@ import {
 } from '@backstage-community/plugin-rbac-common';
 
 import { ConditionsData } from './components/ConditionalAccess/types';
+
+export type { ConditionsData }; // Export ConditionsData
+
 import { RowPolicy } from './components/CreateRole/types';
 
 export type RolesData = {
@@ -71,6 +74,13 @@ export type PermissionsData = {
   conditions?: ConditionsData;
   resourceType?: string;
   usingResourceType?: boolean;
+  // New fields for default policies
+  effect?: string;
+  metadata?: {
+    source?: string;
+    // other metadata fields can be added if needed
+  };
+  entityReference?: string; // For '<default>' or actual role entityRef
 };
 
 /**

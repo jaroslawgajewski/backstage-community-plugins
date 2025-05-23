@@ -28,18 +28,23 @@ jest.mock('@backstage/core-plugin-api', () => ({
       getAssociatedPolicies: jest.fn().mockReturnValue(mockAssociatedPolicies),
       listPermissions: jest.fn().mockReturnValue(mockPermissionPolicies),
       getRoleConditions: jest.fn().mockReturnValue(mockConditions),
+      getDefaultPermissions: jest.fn().mockResolvedValue([]), // Added mock for getDefaultPermissions
     })
     .mockReturnValueOnce({
       getAssociatedPolicies: jest.fn().mockReturnValue(mockAssociatedPolicies),
       listPermissions: jest.fn().mockReturnValue([]),
       getRoleConditions: jest.fn().mockReturnValue([]),
+      getDefaultPermissions: jest.fn().mockResolvedValue([]), // Added mock for getDefaultPermissions
     })
     .mockReturnValue({
       getAssociatedPolicies: jest
         .fn()
-        .mockReturnValue({ status: '403', statusText: 'Unauthorized' }),
+        .mockRejectedValue({ status: 403, message: 'Unauthorized' }), // Corrected mock
       listPermissions: jest.fn().mockReturnValue(mockPermissionPolicies),
       getRoleConditions: jest.fn().mockReturnValue([]),
+      getDefaultPermissions: jest
+        .fn()
+        .mockRejectedValue(new Error('Unauthorized')), // Corrected mock
     }),
 }));
 
@@ -50,7 +55,7 @@ describe('usePermissionPolicies', () => {
     );
     await waitFor(() => {
       expect(result.current.loading).toBeFalsy();
-      expect(result.current.data).toHaveLength(9);
+      expect(result.current.rolePolicies).toHaveLength(9);
     });
   });
 
@@ -60,7 +65,7 @@ describe('usePermissionPolicies', () => {
     );
     await waitFor(() => {
       expect(result.current.loading).toBeFalsy();
-      expect(result.current.data).toHaveLength(0);
+      expect(result.current.rolePolicies).toHaveLength(0);
     });
   });
 
@@ -71,8 +76,8 @@ describe('usePermissionPolicies', () => {
     await waitFor(() => {
       expect(result.current.loading).toBeFalsy();
       expect(result.current.error).toEqual({
-        message: 'Error fetching policies. Unauthorized',
-        name: '403',
+        message: 'Unauthorized',
+        status: 403,
       });
     });
   });
